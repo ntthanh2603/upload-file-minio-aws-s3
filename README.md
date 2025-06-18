@@ -21,7 +21,9 @@
 
 ## Description
 
-Repository user manual use AWS S3 in NestJS
+- Branch <a href="https://github.com/ntthanh2603/upload-file-minio-aws-s3" target="_blank">"main"</a>: User manual use MinIO + AWS S3 in NestJS
+- Branch <a href="https://github.com/ntthanh2603/upload-file-minio-aws-s3/tree/aws-s3" target="_blank">"aws-s3"</a>: User manual AWS S3 in NestJS
+- Branch <a href="https://github.com/ntthanh2603/upload-file-minio-aws-s3/tree/minio" target="_blank">"minio"</a>: User manual MinIO in NestJS
 
 ## Install, compile and run the project
 
