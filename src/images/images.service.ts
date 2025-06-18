@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as Minio from 'minio';
@@ -76,7 +76,7 @@ export class ImagesService {
    * @throws If the presigned URL or public URL cannot be generated.
    * @throws If the entity cannot be saved to the database.
    */
-  async uploadImage(file: Express.Multer.File, dto: CreateImageDto) {
+  public async uploadImage(file: Express.Multer.File, dto: CreateImageDto) {
     if (!file) {
       throw new Error('Cannot upload image.');
     }
@@ -147,9 +147,17 @@ export class ImagesService {
     }
   }
 
-  async delete(id: string) {
+  /**
+   * Deletes an image from the MinIO storage and the database by its ID.
+   *
+   * @param {string} id - The ID of the image to be deleted.
+   * @throws {NotFoundException} Throws if the image is not found in the database.
+   * @returns {Promise<void>} A promise that resolves when the image is successfully deleted.
+   */
+  public async delete(id: string) {
     const image = await this.imageRepo.findOneBy({ id });
-    if (!image) return;
+
+    if (!image) throw new NotFoundException('Image not found.');
 
     await this.minioClient.removeObject(
       process.env.MINIO_BUCKET!,
