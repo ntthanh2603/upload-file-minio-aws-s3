@@ -21,7 +21,7 @@
 
 ## Description
 
-Repository user manual use MinIO in NestJS
+Repository user manual use AWS S3 in NestJS
 
 ## Install, compile and run the project
 
@@ -29,7 +29,7 @@ Repository user manual use MinIO in NestJS
 # Intall library
 $ npm install
 
-# Create file environment
+# Create file environment (Edit file .env.example)
 $ copy .env.example .env
 
 # Initial docker compose contains container Postgres and MinIO

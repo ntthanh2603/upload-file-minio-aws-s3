@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Images } from './entities/images.entity';
 import { ConfigService } from '@nestjs/config';
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { CreateImageDto } from './dto/create-image.dto';
 import { v4 as uuidv4 } from 'uuid';
@@ -84,6 +84,33 @@ export class ImagesService {
       }
 
       throw new Error(`Failed to upload image: ${error.message}`);
+    }
+  }
+
+  public async findOne(id: string): Promise<Images> {
+    const image = await this.imageRepo.findOne({ where: { id } });
+    if (!image) {
+      throw new NotFoundException(`Image with ID ${id} not found`);
+    }
+    return image;
+  }
+
+  public async delete(id: string): Promise<void> {
+    const image = await this.findOne(id);
+    const bucketName = this.configService.getOrThrow('AWS_S3_BUCKET_NAME');
+
+    try {
+      // Delete from S3
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: image.filename,
+      });
+      await this.s3Client.send(deleteCommand);
+
+      // Delete from database
+      await this.imageRepo.delete(id);
+    } catch (error) {
+      throw new Error(`Failed to delete image: ${error.message}`);
     }
   }
 }

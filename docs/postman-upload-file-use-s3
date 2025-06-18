@@ -8,7 +8,7 @@
 	},
 	"item": [
 		{
-			"name": "Upload file to MinIO",
+			"name": "Upload file",
 			"request": {
 				"method": "POST",
 				"header": [],
@@ -42,7 +42,7 @@
 			"response": []
 		},
 		{
-			"name": "Delete file in MinIO",
+			"name": "Delete file",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -51,7 +51,7 @@
 					"formdata": []
 				},
 				"url": {
-					"raw": "http://localhost:3000/images/0b2dded5-3cf4-4168-a0b3-17b4b9c0657a",
+					"raw": "http://localhost:3000/images/1901fc22-525d-4ff5-85a7-69af1dd7cd60",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -59,7 +59,7 @@
 					"port": "3000",
 					"path": [
 						"images",
-						"0b2dded5-3cf4-4168-a0b3-17b4b9c0657a"
+						"1901fc22-525d-4ff5-85a7-69af1dd7cd60"
 					]
 				}
 			},
@@ -89,7 +89,7 @@
 					]
 				},
 				"url": {
-					"raw": "http://localhost:3000/images/e5e42e6f-ed59-414d-8542-9f63e616411a",
+					"raw": "http://localhost:3000/images/5d0ea323-f90a-44de-9939-98ed49823d2d",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -97,7 +97,7 @@
 					"port": "3000",
 					"path": [
 						"images",
-						"e5e42e6f-ed59-414d-8542-9f63e616411a"
+						"5d0ea323-f90a-44de-9939-98ed49823d2d"
 					]
 				}
 			},
