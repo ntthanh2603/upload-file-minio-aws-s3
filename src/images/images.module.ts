@@ -24,7 +24,7 @@ import * as path from 'path';
       fileFilter: (req, file, cb) => {
         // Allow only image files type jpg, jpeg, png
         const ext = path.extname(file.originalname).toLowerCase();
-        if (ext === '.jpeg' || ext === '.png' || ext === '.jpg') {
+        if (['.jpeg', '.png', '.jpg', '.webp'].includes(ext)) {
           cb(null, true);
         } else {
           cb(
