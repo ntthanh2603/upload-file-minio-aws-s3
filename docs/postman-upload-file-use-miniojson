@@ -1,0 +1,107 @@
+{
+	"info": {
+		"_postman_id": "4470b85d-e82f-41c8-8904-694455a3ece5",
+		"name": "Uoload file use MinIO",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38149068",
+		"_collection_link": "https://api-project-nestjs.postman.co/workspace/Nguy%E1%BB%85n-Tu%E1%BA%A5n-Th%C3%A0nh~36c79ac2-b080-4129-ae29-b76abe68673e/collection/38149068-4470b85d-e82f-41c8-8904-694455a3ece5?action=share&source=collection_link&creator=38149068"
+	},
+	"item": [
+		{
+			"name": "Upload file to MinIO",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "postman-cloud:///1ef983a1-adca-4e50-b8be-e88536c35b24"
+						},
+						{
+							"key": "description",
+							"value": "A beautiful landscape photo.",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:3000/images",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"images"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete file in MinIO",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "http://localhost:3000/images/0b2dded5-3cf4-4168-a0b3-17b4b9c0657a",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"images",
+						"0b2dded5-3cf4-4168-a0b3-17b4b9c0657a"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get file",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "postman-cloud:///1ef983a1-adca-4e50-b8be-e88536c35b24"
+						},
+						{
+							"key": "description",
+							"value": "A beautiful landscape photo.",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:3000/images/e5e42e6f-ed59-414d-8542-9f63e616411a",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"images",
+						"e5e42e6f-ed59-414d-8542-9f63e616411a"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
