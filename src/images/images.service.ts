@@ -1,139 +1,148 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as Minio from 'minio';
-import * as fs from 'fs';
-import { CreateImageDto } from './dto/create-image.dto';
 import { Images } from './entities/images.entity';
+import { ConfigService } from '@nestjs/config';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import * as Minio from 'minio';
+import { CreateImageDto } from './dto/create-image.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class ImagesService {
-  private minioClient: Minio.Client;
+  private s3Client: S3Client | null = null;
+  private minioClient: Minio.Client | null = null;
+  private storageProvider: string;
 
   constructor(
+    private readonly configService: ConfigService,
     @InjectRepository(Images)
     private imageRepo: Repository<Images>,
   ) {
-    this.minioClient = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT!,
-      port: parseInt(process.env.MINIO_PORT!) || 9000,
-      useSSL: process.env.MINIO_USE_SSL === 'true',
-      accessKey: process.env.MINIO_ACCESS_KEY!,
-      secretKey: process.env.MINIO_SECRET_KEY!,
-    });
-
-    void this.initializeBucket();
-  }
-
-  /**
-   * Initializes the MinIO bucket. If the bucket does not exist, it creates the
-   * bucket and sets its policy to public read.
-   *
-   * @returns {Promise<void>}
-   * @private
-   */
-  private async initializeBucket() {
-    const bucketName = process.env.MINIO_BUCKET || 'images';
-
-    try {
-      const bucketExists = await this.minioClient.bucketExists(bucketName);
-      if (!bucketExists) {
-        await this.minioClient.makeBucket(bucketName, 'us-east-1');
-
-        // Set bucket policy to public read
-        const policy = {
-          Version: '2012-10-17',
-          Statement: [
-            {
-              Effect: 'Allow',
-              Principal: '*',
-              Action: ['s3:GetObject'],
-              Resource: [`arn:aws:s3:::${bucketName}/*`],
-            },
-          ],
-        };
-
-        await this.minioClient.setBucketPolicy(
-          bucketName,
-          JSON.stringify(policy),
-        );
-      }
-    } catch (error) {
-      console.error('Failed to initialize bucket:', error);
+    this.storageProvider = this.configService
+      .getOrThrow('STORAGE_PROVIDER')
+      .toLowerCase();
+    if (this.storageProvider === 's3') {
+      this.s3Client = new S3Client({
+        region: this.configService.getOrThrow('AWS_S3_REGION'),
+        credentials: {
+          accessKeyId: this.configService.getOrThrow('AWS_ACCESS_KEY_ID'),
+          secretAccessKey: this.configService.getOrThrow(
+            'AWS_SECRET_ACCESS_KEY',
+          ),
+        },
+      });
+    } else if (this.storageProvider === 'minio') {
+      this.minioClient = new Minio.Client({
+        endPoint: this.configService.getOrThrow('MINIO_ENDPOINT'),
+        port: parseInt(this.configService.getOrThrow('MINIO_PORT')) || 9000,
+        useSSL: this.configService.getOrThrow('MINIO_USE_SSL') === 'true',
+        accessKey: this.configService.getOrThrow('MINIO_ACCESS_KEY'),
+        secretKey: this.configService.getOrThrow('MINIO_SECRET_KEY'),
+      });
+      void this.initializeBucket();
+    } else {
+      throw new Error('Invalid STORAGE_PROVIDER. Use "s3" or "minio".');
     }
   }
 
-  /**
-   * Uploads an image to MinIO and creates an image entity in the database.
-   *
-   * @param file The uploaded image file.
-   * @param dto The image metadata.
-   * @returns The created image entity.
-   * @throws If the file is missing or the filename is missing.
-   * @throws If the upload to MinIO fails.
-   * @throws If the presigned URL or public URL cannot be generated.
-   * @throws If the entity cannot be saved to the database.
-   */
+  private async initializeBucket() {
+    const bucketName =
+      this.configService.getOrThrow('MINIO_BUCKET') || 'images';
+    if (this.minioClient) {
+      try {
+        const bucketExists = await this.minioClient.bucketExists(bucketName);
+        if (!bucketExists) {
+          await this.minioClient.makeBucket(bucketName, 'us-east-1');
+          const policy = {
+            Version: '2012-10-17',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Principal: '*',
+                Action: ['s3:GetObject'],
+                Resource: [`arn:aws:s3:::${bucketName}/*`],
+              },
+            ],
+          };
+          await this.minioClient.setBucketPolicy(
+            bucketName,
+            JSON.stringify(policy),
+          );
+        }
+      } catch (error) {
+        console.error('Failed to initialize bucket:', error);
+      }
+    }
+  }
+
   public async uploadImage(file: Express.Multer.File, dto: CreateImageDto) {
     if (!file) {
       throw new Error('Cannot upload image.');
     }
-    if (!file.filename) {
-      throw new Error('File name is missing.');
+    if (!file.path) {
+      throw new Error('File path is missing.');
     }
 
-    const bucketName = process.env.MINIO_BUCKET || 'images';
-
     try {
-      // Create image entity
       const image = new Images();
       image.id = uuidv4();
-      const ext = path.extname(file.filename);
+      const ext = path.extname(file.originalname);
       image.filename = `${image.id}${ext}`;
       image.description = dto.description;
+      image.originalName = file.originalname;
+      image.mimeType = file.mimetype;
+      image.fileSize = file.size;
+      image.storageProvider = this.storageProvider;
 
-      // Upload file to MinIO
-      const metaData = {
-        'Content-Type': file.mimetype,
-        'Cache-Control': 'max-age=31536000',
-      };
-
-      await this.minioClient.fPutObject(
-        bucketName,
-        image.filename,
-        file.path,
-        metaData,
-      );
-
-      // Create presigned URL or public URL
-      if (process.env.MINIO_PRIVATE_ACCESS === 'true') {
-        // If bucket is public access
-        const protocol =
-          process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
-        const port = process.env.MINIO_PORT ? `:${process.env.MINIO_PORT}` : '';
-        image.url = `${protocol}://${process.env.MINIO_ENDPOINT}${port}/${bucketName}/${image.filename}`;
-      } else {
-        // Use presigned URL (expires in 7 days)
-        image.url = await this.minioClient.presignedGetObject(
+      if (this.storageProvider === 's3') {
+        const bucketName = this.configService.getOrThrow('AWS_S3_BUCKET_NAME');
+        const region = this.configService.getOrThrow('AWS_S3_REGION');
+        const upload = new Upload({
+          client: this.s3Client!,
+          params: {
+            Bucket: bucketName,
+            Key: image.filename,
+            Body: fs.createReadStream(file.path),
+            ContentType: file.mimetype,
+          },
+        });
+        await upload.done();
+        image.url = `https://${bucketName}.s3.${region}.amazonaws.com/${image.filename}`;
+      } else if (this.storageProvider === 'minio') {
+        const bucketName =
+          this.configService.getOrThrow('MINIO_BUCKET') || 'images';
+        const metaData = {
+          'Content-Type': file.mimetype,
+          'Cache-Control': 'max-age=31536000',
+        };
+        await this.minioClient!.fPutObject(
           bucketName,
           image.filename,
-          24 * 60 * 60 * 7,
+          file.path,
+          metaData,
         );
+        const protocol =
+          this.configService.getOrThrow('MINIO_USE_SSL') === 'true'
+            ? 'https'
+            : 'http';
+        const port = this.configService.getOrThrow('MINIO_PORT')
+          ? `:${this.configService.getOrThrow('MINIO_PORT')}`
+          : '';
+        image.url = `${protocol}://${this.configService.getOrThrow('MINIO_ENDPOINT')}${port}/${bucketName}/${image.filename}`;
       }
 
-      // Soft delete
       try {
         fs.unlinkSync(file.path);
       } catch (error) {
         console.warn('Failed to delete temporary file:', error);
       }
 
-      // Save to database
       return await this.imageRepo.save(image);
     } catch (error) {
-      // Cleanup
       try {
         fs.unlinkSync(file.path);
       } catch (unlinkError) {
@@ -142,38 +151,37 @@ export class ImagesService {
           unlinkError,
         );
       }
-
       throw new Error(`Failed to upload image: ${error.message}`);
     }
   }
 
-  /**
-   * Deletes an image from the MinIO storage and the database by its ID.
-   *
-   * @param {string} id - The ID of the image to be deleted.
-   * @throws {NotFoundException} Throws if the image is not found in the database.
-   * @returns {Promise<void>} A promise that resolves when the image is successfully deleted.
-   */
-  public async delete(id: string) {
-    const image = await this.imageRepo.findOneBy({ id });
-
-    if (!image) throw new NotFoundException('Image not found.');
-
-    await this.minioClient.removeObject(
-      process.env.MINIO_BUCKET!,
-      image.filename,
-    );
-    return this.imageRepo.remove(image);
+  public async findOne(id: string): Promise<Images> {
+    const image = await this.imageRepo.findOne({ where: { id } });
+    if (!image) {
+      throw new NotFoundException(`Image with ID ${id} not found`);
+    }
+    return image;
   }
 
-  /**
-   * Finds an image by its ID from the database.
-   *
-   * @param {string} id - The ID of the image to be found.
-   * @throws {NotFoundException} Throws if the image is not found in the database.
-   * @returns {Promise<Images | null>} A promise that resolves to the found image or null if not found.
-   */
-  public async findOne(id: string) {
-    return await this.imageRepo.findOneBy({ id });
+  public async delete(id: string): Promise<void> {
+    const image = await this.findOne(id);
+
+    try {
+      if (image.storageProvider === 's3') {
+        const bucketName = this.configService.getOrThrow('AWS_S3_BUCKET_NAME');
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: image.filename,
+        });
+        await this.s3Client!.send(deleteCommand);
+      } else if (image.storageProvider === 'minio') {
+        const bucketName =
+          this.configService.getOrThrow('MINIO_BUCKET') || 'images';
+        await this.minioClient!.removeObject(bucketName, image.filename);
+      }
+      await this.imageRepo.delete(id);
+    } catch (error) {
+      throw new Error(`Failed to delete image: ${error.message}`);
+    }
   }
 }
