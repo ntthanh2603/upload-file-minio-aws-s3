@@ -165,4 +165,15 @@ export class ImagesService {
     );
     return this.imageRepo.remove(image);
   }
+
+  /**
+   * Finds an image by its ID from the database.
+   *
+   * @param {string} id - The ID of the image to be found.
+   * @throws {NotFoundException} Throws if the image is not found in the database.
+   * @returns {Promise<Images | null>} A promise that resolves to the found image or null if not found.
+   */
+  public async findOne(id: string) {
+    return await this.imageRepo.findOneBy({ id });
+  }
 }

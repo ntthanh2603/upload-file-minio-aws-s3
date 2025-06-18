@@ -6,6 +6,7 @@ import {
   UploadedFile,
   UseInterceptors,
   Body,
+  Get,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImagesService } from './images.service';
@@ -27,7 +28,11 @@ export class ImagesController {
 
   @Delete(':id')
   remove(@Param() { id }: IdQueryParamDto) {
-    console.log(id);
     return this.imagesService.delete(id);
+  }
+
+  @Get(':id')
+  findOne(@Param() { id }: IdQueryParamDto) {
+    return this.imagesService.findOne(id);
   }
 }
